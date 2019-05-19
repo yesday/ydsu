@@ -1,0 +1,188 @@
+#!/usr/bin/env groovy-shebang
+package ydsu.module.manage
+
+import groovy.transform.BaseScript
+import groovy.transform.Field
+import org.yaml.snakeyaml.Yaml
+import ydsu.module.manage.lib.Module
+import ydsu.module.manage.lib.OSFamily
+import ydsu.module.util.lib.Exec
+import ydsu.module.util.lib.LoggingBaseScript
+
+@BaseScript LoggingBaseScript baseScript
+
+/**
+ * Loads the changes from the `module.yml` file. Git clones modules into `~/appdata/ydsu/cache` and/or removes
+ * the ones that are no longer present inside the `module.yml` file. Updates the ansible-managed block for ydsu's
+ * system path inside `.bashrc`. Note that this command will not update existing modules, which can be done by the
+ * `ydsuPull` command.
+ */
+@Grab(group = 'org.yaml', module = 'snakeyaml', version = '1.24', transitive = false)
+@Grab(group = 'com.google.guava', module = 'guava', version = '27.1-jre', transitive = false)
+@Field private final File USER_HOME = new File(System.getProperty('user.home'))
+@Field private final File YDSU_HOME = new File(USER_HOME, 'appdata/ydsu/')
+@Field private final File YDSU_CACHE = new File(YDSU_HOME, 'cache/')
+@Field private final File YDSU_MODULE = new File(YDSU_HOME, 'src/main/groovy/ydsu/module/')
+@Field private final File YDSU_PARENT_OF_ROOT_PACKAGE = new File(YDSU_HOME, 'src/main/groovy/')
+@Field private final File YDSU_DISTRIBUTION = new File(YDSU_HOME, 'distribution/')
+
+void parseModulesConfiguration() {
+    File f = new File(YDSU_DISTRIBUTION, "module.yml")
+    if (f.exists()) {
+        Yaml yaml = new Yaml()
+        LinkedHashMap conf = yaml.load(f.text)
+        boolean autoPull = conf.autopull
+        List<String> module = conf.module
+        if (module) {
+            createModules(autoPull, module)
+        } else {
+            warn "$f modules list is empty, no modules are loaded"
+        }
+    } else {
+        warn "$f does not exist, no modules are loaded"
+    }
+}
+
+void createModules(boolean autoPull, List<String> moduleLocalPathsOrGitUrls) {
+    List<Module> modules = moduleLocalPathsOrGitUrls.collect { Module.newInstance(autoPull, it) }
+    generateSystemPath(modules)
+    generateClassPathListString(modules)
+}
+
+void generateSystemPath(List<Module> modules) {
+    StringBuilder sb = new StringBuilder()
+    String module = YDSU_MODULE.toString().replaceAll(USER_HOME.toString(), '\\\$HOME')
+    sb.append('        ').append(module).append('/').append('manage').append(':\\\n')
+    sb.append('        ').append(module).append('/').append('util').append(':\\\n')
+    TreeSet<String> allPaths = modules.collect { it.systemPath }.flatten()
+    if (allPaths.isEmpty()) {
+        warn "couldn't load any module"
+    } else {
+        allPaths.each {
+            sb.append('        ').append(it.replaceAll(USER_HOME.toString(), '\\\$HOME')).append(':\\\n')
+            // sb.append(it).append(':')
+        }
+    }
+    sb.delete(sb.length() - 3, sb.length())
+    // Pass the system path of the modules
+    generateSystemPathPlaybook(sb)
+}
+
+void generateSystemPathPlaybook(StringBuilder systemPath) {
+    OSFamily osFamily = OSFamily.newInstance()
+    /**
+     * - .bash_profile is executed for login shells
+     * - .bashrc is executed for interactive non-login shells
+     * - Unlike other UNIX systems, on macOS, Terminal by default runs a login shell every time, meaning that
+     *   .bash_profile is executed every time
+     */
+    String bashConfig = osFamily == OSFamily.DARWIN ? '.bash_profile' : '.bashrc'
+    def playbookYaml = """
+---
+- name: System path configuration
+  hosts: 127.0.0.1
+  connection: local
+
+  tasks:
+  - name: Include .extend${bashConfig} in ${bashConfig}
+    lineinfile:
+      dest: ~/${bashConfig}
+      regexp: "{{ item.regexp }}"
+      line: "{{ item.line }}"
+      insertafter: EOF
+      state: present
+    with_items:
+    - regexp: "^#?\\\\[\\\\[ -f ~/.extend${bashConfig} \\\\]\\\\]"
+      line: '[[ -f ~/.extend${bashConfig} ]] && . ~/.extend${bashConfig}'
+  - name: Insert/update system path configuration block in .extend${bashConfig}
+    blockinfile:
+      path: ~/.extend${bashConfig}
+      block: |
+        PATH="\$PATH:\\
+${systemPath.toString()}"
+      marker: "# {mark} YDSU ANSIBLE MANAGED BLOCK FOR SYSTEM PATH"
+      create: yes
+  - name: Include .extend.zshrc in .zshrc
+    lineinfile:
+      dest: ~/.zshrc
+      regexp: "{{ item.regexp }}"
+      line: "{{ item.line }}"
+      insertafter: EOF
+      state: present
+    with_items:
+    - regexp: "^#?\\\\[\\\\[ -f ~/.extend.zshrc \\\\]\\\\]"
+      line: '[[ -f ~/.extend.zshrc ]] && . ~/.extend.zshrc'
+  - name: Insert/update system path configuration block in .extend.zshrc
+    blockinfile:
+      path: ~/.extend.zshrc
+      block: |
+        PATH="\$PATH:\\
+${systemPath.toString()}"
+      marker: "# {mark} YDSU ANSIBLE MANAGED BLOCK FOR SYSTEM PATH"
+      create: yes      
+"""
+    File cacheDir = new File(YDSU_CACHE, 'ydsu-system-path')
+    cacheDir.mkdirs()
+    File playbook = new File(cacheDir, 'playbook.yml')
+    playbook.write(playbookYaml)
+    runPlaybook(playbook)
+}
+
+void runPlaybook(File playbook) {
+    info Exec.command("ansible-playbook $playbook")
+}
+
+void generateClassPathListString(List<Module> modules) {
+    StringBuilder sb = new StringBuilder()
+    sb.append('List<String> parentsOfRootPackage = [')
+    TreeSet<String> allClassPaths = modules.collect { it.classPath }.flatten()
+    allClassPaths << YDSU_PARENT_OF_ROOT_PACKAGE.toString()
+    if (!allClassPaths.isEmpty()) {
+        allClassPaths.each {
+            sb.append('"').append(it.replaceAll(USER_HOME.toString(), '\\\${System.getProperty(\'user.home\')}')).append('",\n')
+        }
+    }
+    sb.delete(sb.length() - 2, sb.length()).append(']')
+    generateClassPathConfiguration(sb.toString())
+}
+
+void generateClassPathConfiguration(String classPathListString) {
+    def confGroovy = """
+package ydsu.module.util.conf
+/**
+ * For documentation refer to
+ *
+ * - http://docs.groovy-lang.org/latest/html/api/org/codehaus/groovy/control/CompilerConfiguration.html
+ * - https://mrhaki.blogspot.gr/2016/01/groovy-goodness-customising-groovy.html
+ *
+ * Starting from the src/main/groovy directory, add all the subdirectories recursively to the classpath
+ * (src/main/groovy/ydsu/module/util/../../../).
+ */
+List<String> dirs = []
+
+${classPathListString.toString()}
+
+parentsOfRootPackage.collect { new File(it) } .each {
+    dirs << it.toString()
+    it.eachDirRecurse {
+        dirs << it.toString()
+    }
+}
+
+String ydsuClasspath = System.getenv("YDSU_CLASSPATH")
+if (ydsuClasspath) {
+    dirs.addAll(ydsuClasspath.tokenize(':'))
+}
+
+configuration.setClasspathList(dirs)
+// configuration.setScriptBaseClass('common.basic.lib.LoggingBaseScript')
+"""
+    writeClassPathConfiguration(confGroovy)
+}
+
+void writeClassPathConfiguration(String confGroovy) {
+    File conf = new File(YDSU_MODULE, 'util/conf/groovyCompilerConfiguration.groovy')
+    conf.write(confGroovy)
+}
+
+parseModulesConfiguration()

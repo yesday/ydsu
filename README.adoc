@@ -1,0 +1,127 @@
+= YesDay System Utilities (YDSU)
+Doc Writer <yesdayuk@gmail.com>
+v1.0, 2019-05-19
+:toc: macro
+toc::[]
+:numbered:
+
+== About
+
+YesDay System Utilities (YDSU), pronounced `i'dsʊ`, is a package manager for your shell scripts. Primarily targeted for use by Developers, SysAdmins, Power Users, DevOps and Operations Engineers, ydsu is designed to encourage modification of the shell scripts in an IDE-friendly way. Shell scripts of relevant functionality are grouped together into modules and are managed by the management scripts provided by ydsu. Modules can be either external, developed by a third party, or your own. You specify the list of modules you want to use inside the `module.yml` file. Your local configuration of modules inside the `module.yml` is called a distribution.
+
+Advantages
+
+* Lightweight - Only requires git, ansible and groovy to be present on your system as it is written in groovy and ansible. Even works with ZSH too.
+* Multi-platform - Runs on any UNIX based platforms: Mac OSX, Linux, Cygwin, Solaris and FreeBSD.
+
+== Install
+
+Paste and run the following in a terminal:
+`$ curl -s "https://raw.githubusercontent.com/yesday/ydsu/master/src/main/bash/install/ydsu-install.sh" | bash`
+
+== Usage
+
+Install
+
+* *ydsu-install.sh*: Installs ydsu on your local system. A bash script that copies the default distribution to `~/appdata/ydsu/distribution` and checks for the prerequisites `git`, `groovy` and `ansible`. Also, adds the ansible-managed block for ydsu's system path to `.bashrc`.
+* *ydsuUninstall*: Uninstalls ydsu from your local system. A groovy script that removes the ansible-managed block for ydsu's system path from `.bashrc`. Also, clears the `~/appdata/ydsu/cache` directory.
+
+Configure
+
+* ~/appdata/ydsu/distribution/*module.yml*: Edit this file to specify the list of modules you wish to use. Also, as described in <<Installation directory layout>>, it is recommended to maintain the content of the distribution directory in a git repository.
+* *ydsuLoadModules*: Loads the changes from the above `module.yml` file. Git clones modules into `~/appdata/ydsu/cache` and/or removes the ones that are no longer present inside the `module.yml` file. Updates the ansible-managed block for ydsu's system path inside `.bashrc`. Configures Groovy Compiler's classpath inside `~/appdata/ydsu/src/main/groovy/ydsu/module/util/conf/groovyCompilerConfiguration.groovy`. Note that this command will not update existing modules, which can be done by the `ydsuPull` command documented below.
+
+Use
+
+* *skeletonListCommands*: Execute this groovy script to verify the installation. The script comes as part of the `skeleton` module which is pre-configured inside the `~/appdata/ydsu/distribution/module.yml` of the default distribution.
+
+Extend
+
+* Create a new module and push it to a local or remote git repository. A module can contain anything that would work by adding it to your system path, such as a bash or groovy shell script, or an ansible playbook. Use the `skeleton` module as a blueprint for your own modules.
+* ~/appdata/ydsu/distribution/*module.yml*: Edit the `module.yml` file to add the new module into your distribution.
+* *ydsuLoadModules*: Always remember to run `ydsuLoadModules` after modifying `module.yml` in order for the changes to take effect.
+
+Maintain
+
+* *ydsuPull*: Git pulls module updates for every module inside `~/appdata/ydsu/cache`. Also, updates ydsu itself, including the files `version.txt`, `ydsuLoadModules`, `ydsuPull` and `ydsuUninstall` under the `~/appdata/ydsu/src` directory.
+
+== Configuration guide for module.yml
+
+A module consists of a group of shell scripts of relevant functionality that are grouped together into a directory. The module directory is usually versioned and is part of a project structure, such as the gradle's directory layout for a groovy application (e.g. `gradle init --type groovy-application`). The latter is to encourage modification of the shell scripts in an IDE-friendly way. Modules can be either external, developed by a third party, or your own. A module is configured by specifying a local or remote path. The path can refer to either a single module or a collection of modules.
+
+.module.yml
+[source, yaml]
+----
+autoPull: no // <1>
+modules:
+  - https://github.com/yesday/ydsu-module/master/src/main/groovy/ydsu/module/skeleton // <2>
+  - ~/my-ydsu-module/src/main/groovy/ydsu/module // <3>
+  - ~/mycompany-ydsu-module/src/main/groovy/ydsu/module/mycompany // <4>
+----
+
+<1> Whether to perform an automatic git pull for the configured modules.
+<2> Remote path to a module. The module will be automatically cloned into `~/appdata/ydsu/cache/yesday/ydsu-module/src/main/groovy/ydsu/module/skeleton` by the `ydsuLoadModules` management script. Note the use of the master branch encoded into the URL.
+<3> Local path to a list of modules. The path can be a plain directory or a local git repository. Local paths are used as is without being copied into the `~/appdata/ydsu/cache` directory.
+<4> Local path to a single module, which includes scripts relevant to your work environment.
+
+== Installation directory layout
+
+----
+~/appdata
+    ydsu
+        cache // <1>
+        distribution // <2>
+            module.yml
+        src
+            main
+                groovy
+                    ydsu
+                        module
+                            manage // <3>
+                                ydsuLoadModules
+                                ydsuPull
+                                ydsuUninstall
+        version.txt
+----
+
+<1> Local cache holding cloned git repositories of the list of modules inside `module.yml`.
+<2> Your local configuration of modules inside the `module.yml` is called a distribution. Therefore, it is recommended to maintain the content of this directory in a git repository. In particular, after the initial installation you can clone any external/internal distribution that is tailored to your needs, for example: `rm -rf ~/appdata/ydsu/distribution; git clone https://github.com/yesday/ydsu-distribution-macos.git ~/appdata/ydsu/distribution`
+<3> YDSU management scripts
+
+== Project directory layout
+
+The project directory layout conforms to the gradle's directory layout for a groovy application (e.g. `gradle init --type groovy-application`).
+
+----
+ydsu
+  LICENSE
+  README.adoc
+  src
+     main
+        bash
+           install
+              ydsu-install.sh
+        groovy
+           ydsu
+              module
+                 manage
+                    lib
+                       Module.groovy
+                       ModuleGitUrl.groovy
+                       OSFamily.groovy
+                    ydsuLoadModules
+                    ydsuPull
+                    ydsuUninstall
+                 util
+                    conf
+                       groovyCompilerConfiguration.groovy
+                       logback.groovy
+                    lib
+                       Exec.groovy
+                       LoggingBaseScript.groovy
+                    groovy-shebang
+        resources
+           distribution
+              module.yml
+           version.txt
+----

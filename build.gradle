@@ -1,0 +1,48 @@
+plugins {
+    id 'groovy'
+    id 'maven-publish'
+}
+
+group = 'io.github.yesday'
+version = '1.0.0-SNAPSHOT'
+
+configurations.all {
+    transitive = false
+    resolutionStrategy {
+        // fail eagerly on version conflict (includes transitive dependencies)
+        // e.g. multiple different versions of the same dependency (group and name are equal)
+        failOnVersionConflict()
+    }
+}
+
+repositories {
+    jcenter()
+    mavenLocal()
+}
+
+dependencies {
+    implementation group: 'org.codehaus.groovy', name: 'groovy', version: '3.0.0-beta-1'
+    testImplementation group: 'org.spockframework', name: 'spock-core', version: '1.3-groovy-2.5'
+    /**
+     * Adding the below dependencies is not required but offers two benefits
+     *
+     * - Makes the IDE download their sources
+     * - Enables IDE autocompletion for scripts under src/main/groovy
+     */
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.26' // 1.8.0-beta4
+    implementation group: 'ch.qos.logback', name: 'logback-core', version: '1.2.3' // 1.3.0-alpha4
+    implementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
+    implementation group: 'com.google.guava', name: 'guava', version: '27.1-jre'
+    implementation group: 'org.yaml', name: 'snakeyaml', version: '1.24'
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        mavenLocal()
+    }
+}

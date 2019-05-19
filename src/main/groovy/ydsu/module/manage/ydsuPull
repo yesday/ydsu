@@ -1,0 +1,9 @@
+#!/usr/bin/env groovy-shebang
+package ydsu.module.manage
+
+import groovy.transform.BaseScript
+import ydsu.module.util.lib.LoggingBaseScript
+
+@BaseScript LoggingBaseScript baseScript
+
+throw new UnsupportedOperationException('This functionality hasn\'t been implemented yet')

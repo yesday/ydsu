@@ -1,0 +1,3 @@
+autoPull: no
+module:
+  - https://github.com/yesday/ydsu-module/master/src/main/groovy/ydsu/module/skeleton
