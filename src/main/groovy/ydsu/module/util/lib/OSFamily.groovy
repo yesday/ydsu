@@ -1,4 +1,4 @@
-package ydsu.module.manage.lib
+package ydsu.module.util.lib
 
 enum OSFamily {
     LINUX,

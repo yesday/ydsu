@@ -5,7 +5,7 @@ import groovy.transform.BaseScript
 import groovy.transform.Field
 import org.yaml.snakeyaml.Yaml
 import ydsu.module.manage.lib.Module
-import ydsu.module.manage.lib.OSFamily
+import ydsu.module.util.lib.OSFamily
 import ydsu.module.util.lib.Exec
 import ydsu.module.util.lib.LoggingBaseScript
 

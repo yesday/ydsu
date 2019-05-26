@@ -85,10 +85,10 @@ class Module {
             File dir = new File(path)
             if (dir.exists() && dir.name != '.git') {
                 /**
-                 * If the localPath directory has at least one file then it is a single module.
-                 * Otherwise, it's a collection of modules.
+                 * If the localPath directory has at least one regular file then it is a single module.
+                 * Otherwise, it's a collection of modules. Hidden files like .DS_Store are NOT taken into account.
                  */
-                if (dir.listFiles({ it.isFile() } as FileFilter)) {
+                if (dir.listFiles({ it.isFile() && !it.isHidden() } as FileFilter)) {
                     systemPath << dir.toString()
                     log.info "Loaded single module {}", dir.name
                 } else {
