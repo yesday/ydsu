@@ -2,8 +2,73 @@
 package ydsu.module.manage
 
 import groovy.transform.BaseScript
-import ydsu.module.util.lib.LoggingBaseScript
+import ydsu.module.manage.conf.PathConf
+import ydsu.module.util.source.LoggingBaseScript
+
+import static ydsu.module.util.source.Exec.longCommand
 
 @BaseScript LoggingBaseScript baseScript
 
-throw new UnsupportedOperationException('This functionality hasn\'t been implemented yet')
+private String begin(String description, int ... step) {
+    "${step.join('.')}) BEGIN: $description"
+}
+
+private String end(int ... step) {
+    "${step.join('.')}) END ".padRight(80, '-')
+}
+
+private boolean isGitRepository(File repositoryDir) {
+    if (new File(repositoryDir, '.git').exists()) {
+        return true
+    }
+    warn "$repositoryDir is not a git repository: skipped pull"
+    return false
+}
+
+info ''
+info begin("Pull ydsu source under ${PathConf.YDSU_SOURCE}", 1)
+try {
+    File ydsuSource = new File(PathConf.YDSU_SOURCE)
+    if (isGitRepository(ydsuSource)) {
+        longCommand 'git pull', ydsuSource
+        info 'Pulled ydsu source'
+    }
+} catch (Exception e) {
+    error "Failed to pull ydsu source: $e.message"
+}
+info end(1)
+
+info ''
+info begin("Pull modules under ${PathConf.PUBLIC_MODULES_SOURCE_DIR}", 2)
+int count = 0
+List<String> failedToPull = new ArrayList<>()
+new File(PathConf.PUBLIC_MODULES_SOURCE_DIR).eachDir {
+    it.eachDir {
+        count++
+        info ''
+        String repository = "${it.parentFile.name}/${it.name}"
+        info begin("Pull ${repository}", 2, count)
+        try {
+            if (isGitRepository(it)) {
+                longCommand 'git pull', it
+                info "Pulled ${repository}"
+            } else {
+                failedToPull << repository
+            }
+        } catch (Exception e) {
+            error "Failed to pull ${repository}: $e.message"
+            failedToPull << repository
+        }
+        info end(2, count)
+    }
+}
+
+info ''
+if (failedToPull.size()) {
+    error "Failed to pull ${failedToPull.size()} out of $count modules: refer to previous errors for details: ${failedToPull}"
+} else if (count) {
+    info "Pulled $count modules"
+} else {
+    info "No public modules were found to pull"
+}
+info end(2)

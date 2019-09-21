@@ -93,3 +93,9 @@ sonar-project.properties
 ##########################
 node_modules/
 package-lock.json
+
+##########################
+## Project-specific
+##########################
+temp.adoc
+!/src/test/groovy/ydsu/module/util/source/inttestscript/build/

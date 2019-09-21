@@ -2,8 +2,58 @@
 package ydsu.module.manage
 
 import groovy.transform.BaseScript
-import ydsu.module.util.lib.LoggingBaseScript
+import ydsu.module.manage.conf.PathConf
+import ydsu.module.util.conf.AppDataDirConf
+import ydsu.module.util.source.LoggingBaseScript
+
+import static ydsu.module.util.source.Exec.longCommand
 
 @BaseScript LoggingBaseScript baseScript
 
-throw new UnsupportedOperationException('This functionality hasn\'t been implemented yet')
+void generateSystemPathPlaybook() {
+    def playbookYaml = """
+---
+- name: Clear system path for ydsu modules
+  hosts: 127.0.0.1
+  connection: local
+
+  tasks:
+  - name: Remove system path configuration block from ${PathConf.EXTEND_BASH_CONF}
+    blockinfile:
+      path: ~/${PathConf.EXTEND_BASH_CONF}
+      marker: "${PathConf.SYSTEM_PATH_CONF_MARKER}"
+      create: no
+  - name: Remove system path configuration block from ${PathConf.EXTEND_ZSH_CONF}
+    blockinfile:
+      path: ~/${PathConf.EXTEND_ZSH_CONF}
+      marker: "${PathConf.SYSTEM_PATH_CONF_MARKER}"
+      create: no      
+"""
+    PathConf.SYSTEM_PATH_WRITE_PLAYBOOK.write(playbookYaml)
+    runPlaybook()
+}
+
+void runPlaybook() {
+    longCommand("ansible-playbook ${PathConf.SYSTEM_PATH_WRITE_PLAYBOOK}")
+}
+
+info ''
+info 'Uninstall ydsu'
+
+info ''
+info "Remove ${PathConf.SYSTEM_PATH_CONF_TITLE} from ${PathConf.EXTEND_BASH_CONF} and ${PathConf.EXTEND_ZSH_CONF}."
+generateSystemPathPlaybook()
+
+info "Clear ${PathConf.PUBLIC_MODULES_SOURCE_DIR}"
+longCommand "rm -rf ${PathConf.PUBLIC_MODULES_SOURCE_DIR}"
+
+info ''
+info "Clear ${AppDataDirConf.CACHE}"
+longCommand "rm -rf ${AppDataDirConf.CACHE}"
+
+info ''
+info "Clear ${PathConf.YDSU_SOURCE}"
+longCommand "rm -rf ${PathConf.YDSU_SOURCE}"
+
+info ''
+info 'Successfully uninstalled ydsu'

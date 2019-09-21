@@ -2,12 +2,15 @@
 package ydsu.module.manage
 
 import groovy.transform.BaseScript
-import groovy.transform.Field
 import org.yaml.snakeyaml.Yaml
-import ydsu.module.manage.lib.Module
-import ydsu.module.util.lib.OSFamily
-import ydsu.module.util.lib.Exec
-import ydsu.module.util.lib.LoggingBaseScript
+import ydsu.module.manage.conf.PathConf
+import ydsu.module.util.conf.AppDataDirConf
+import ydsu.module.util.source.LocalModuleConf
+import ydsu.module.util.source.LoggingBaseScript
+import ydsu.module.util.source.ModuleConfFactory
+import ydsu.module.util.source.PublicModuleConf
+
+import static ydsu.module.util.source.Exec.longCommand
 
 @BaseScript LoggingBaseScript baseScript
 
@@ -17,137 +20,150 @@ import ydsu.module.util.lib.LoggingBaseScript
  * system path inside `.bashrc`. Note that this command will not update existing modules, which can be done by the
  * `ydsuPull` command.
  */
-@Grab(group = 'org.yaml', module = 'snakeyaml', version = '1.24', transitive = false)
-@Grab(group = 'com.google.guava', module = 'guava', version = '27.1-jre', transitive = false)
-@Field private final File USER_HOME = new File(System.getProperty('user.home'))
-@Field private final File YDSU_HOME = new File(USER_HOME, 'appdata/ydsu/')
-@Field private final File YDSU_CACHE = new File(YDSU_HOME, 'cache/')
-@Field private final File YDSU_MODULE = new File(YDSU_HOME, 'src/main/groovy/ydsu/module/')
-@Field private final File YDSU_PARENT_OF_ROOT_PACKAGE = new File(YDSU_HOME, 'src/main/groovy/')
-@Field private final File YDSU_DISTRIBUTION = new File(YDSU_HOME, 'distribution/')
+@Grab(group = 'org.yaml', module = 'snakeyaml', version = '1.25', transitive = false)
 
 void parseModulesConfiguration() {
-    File f = new File(YDSU_DISTRIBUTION, "module.yml")
-    if (f.exists()) {
+    if (PathConf.MODULE_READ_CONF.exists()) {
         Yaml yaml = new Yaml()
-        LinkedHashMap conf = yaml.load(f.text)
-        boolean autoPull = conf.autopull
-        List<String> module = conf.module
-        if (module) {
-            createModules(autoPull, module)
+        LinkedHashMap conf = yaml.load(PathConf.MODULE_READ_CONF.text)
+        List<String> confLines = conf.module
+        if (confLines) {
+            info "Using module.yml: ${PathConf.MODULE_READ_CONF}"
+            if (PathConf.MODULE_READ_CONF != PathConf.MODULE_WRITE_CONF) {
+                info "To update the configuration create a copy of the above module.yml in ${PathConf.MODULE_WRITE_CONF}"
+            }
+            createModuleConfigurations(confLines)
         } else {
-            warn "$f modules list is empty, no modules are loaded"
+            warn "Modules list is empty, no modules are loaded: ${PathConf.MODULE_READ_CONF}"
         }
     } else {
-        warn "$f does not exist, no modules are loaded"
+        warn "File does not exist, no modules are loaded: ${PathConf.MODULE_READ_CONF}"
     }
 }
 
-void createModules(boolean autoPull, List<String> moduleLocalPathsOrGitUrls) {
-    List<Module> modules = moduleLocalPathsOrGitUrls.collect { Module.newInstance(autoPull, it) }
-    generateSystemPath(modules)
-    generateClassPathListString(modules)
+void createModuleConfigurations(List<String> confLines) {
+    ModuleConfFactory moduleConfFactory = new ModuleConfFactory()
+    List<LocalModuleConf> moduleConfs
+    try {
+        moduleConfs = confLines.collect { moduleConfFactory.newModuleConf(it) }
+    } catch (IllegalArgumentException e) {
+        String msg = "Could not parse ${PathConf.MODULE_READ_CONF}: "
+        if (PathConf.MODULE_READ_CONF == PathConf.MODULE_WRITE_CONF) {
+            msg += "fix the errors and try again"
+        } else {
+            msg += "create a copy in ${PathConf.MODULE_WRITE_CONF}, fix the errors, and try again"
+        }
+        throw new RuntimeException(msg, e)
+    }
+    cloneModules(moduleConfs)
+    generateSystemPathListString(moduleConfs)
+    generateClassPathListString(moduleConfs)
+    cleanCache(moduleConfs)
 }
 
-void generateSystemPath(List<Module> modules) {
+void cloneModules(List<LocalModuleConf> moduleConfs) {
+    moduleConfs.each {
+        if (it instanceof PublicModuleConf) {
+            if (!it.moduleMetadata) {
+                PublicModuleConf pmc = it
+                pmc.gitClone()
+            }
+        }
+    }
+}
+
+void generateSystemPathListString(List<LocalModuleConf> moduleConfs) {
     StringBuilder sb = new StringBuilder()
-    String module = YDSU_MODULE.toString().replaceAll(USER_HOME.toString(), '\\\$HOME')
-    sb.append('        ').append(module).append('/').append('manage').append(':\\\n')
-    sb.append('        ').append(module).append('/').append('util').append(':\\\n')
-    TreeSet<String> allPaths = modules.collect { it.systemPath }.flatten()
-    if (allPaths.isEmpty()) {
+    String internalModulesParentDir = PathConf.MODULES_PARENT_DIR.replaceAll(AppDataDirConf.USER_HOME, '\\\$HOME')
+    sb.append('        ').append(internalModulesParentDir).append('manage').append(':\\\n')
+    sb.append('        ').append(internalModulesParentDir).append('util').append(':\\\n')
+    TreeSet<String> allSystemPaths = moduleConfs.collect { it.systemPath }.flatten()
+    if (allSystemPaths.isEmpty()) {
         warn "couldn't load any module"
     } else {
-        allPaths.each {
-            sb.append('        ').append(it.replaceAll(USER_HOME.toString(), '\\\$HOME')).append(':\\\n')
+        allSystemPaths.each {
+            sb.append('        ').append(it.replaceAll(AppDataDirConf.USER_HOME, '\\\$HOME')).append(':\\\n')
             // sb.append(it).append(':')
         }
     }
     sb.delete(sb.length() - 3, sb.length())
     // Pass the system path of the modules
-    generateSystemPathPlaybook(sb)
+    generateSystemPathPlaybook(sb.toString())
 }
 
-void generateSystemPathPlaybook(StringBuilder systemPath) {
-    OSFamily osFamily = OSFamily.newInstance()
-    /**
-     * - .bash_profile is executed for login shells
-     * - .bashrc is executed for interactive non-login shells
-     * - Unlike other UNIX systems, on macOS, Terminal by default runs a login shell every time, meaning that
-     *   .bash_profile is executed every time
-     */
-    String bashConfig = osFamily == OSFamily.DARWIN ? '.bash_profile' : '.bashrc'
+void generateSystemPathPlaybook(String systemPath) {
     def playbookYaml = """
 ---
-- name: System path configuration
+- name: Configure system path for ydsu modules
   hosts: 127.0.0.1
   connection: local
 
   tasks:
-  - name: Include .extend${bashConfig} in ${bashConfig}
+  - name: Include ${PathConf.EXTEND_BASH_CONF} in ${PathConf.BASH_CONF}
     lineinfile:
-      dest: ~/${bashConfig}
+      dest: ~/${PathConf.BASH_CONF}
       regexp: "{{ item.regexp }}"
       line: "{{ item.line }}"
       insertafter: EOF
       state: present
     with_items:
-    - regexp: "^#?\\\\[\\\\[ -f ~/.extend${bashConfig} \\\\]\\\\]"
-      line: '[[ -f ~/.extend${bashConfig} ]] && . ~/.extend${bashConfig}'
-  - name: Insert/update system path configuration block in .extend${bashConfig}
+    - regexp: "^#?\\\\[\\\\[ -f ~/${PathConf.EXTEND_BASH_CONF} \\\\]\\\\]"
+      line: '[[ -f ~/${PathConf.EXTEND_BASH_CONF} ]] && . ~/${PathConf.EXTEND_BASH_CONF}'
+  - name: Insert/update system path configuration block in ${PathConf.EXTEND_BASH_CONF}
     blockinfile:
-      path: ~/.extend${bashConfig}
+      path: ~/${PathConf.EXTEND_BASH_CONF}
       block: |
         PATH="\$PATH:\\
-${systemPath.toString()}"
-      marker: "# {mark} YDSU ANSIBLE MANAGED BLOCK FOR SYSTEM PATH"
+${systemPath}"
+      marker: "${PathConf.SYSTEM_PATH_CONF_MARKER}"
       create: yes
-  - name: Include .extend.zshrc in .zshrc
+  - name: Include ${PathConf.EXTEND_ZSH_CONF} in ${PathConf.ZSH_CONF}
     lineinfile:
-      dest: ~/.zshrc
+      dest: ~/${PathConf.ZSH_CONF}
       regexp: "{{ item.regexp }}"
       line: "{{ item.line }}"
       insertafter: EOF
       state: present
+      create: yes
     with_items:
-    - regexp: "^#?\\\\[\\\\[ -f ~/.extend.zshrc \\\\]\\\\]"
-      line: '[[ -f ~/.extend.zshrc ]] && . ~/.extend.zshrc'
-  - name: Insert/update system path configuration block in .extend.zshrc
+    - regexp: "^#?\\\\[\\\\[ -f ~/${PathConf.EXTEND_ZSH_CONF} \\\\]\\\\]"
+      line: '[[ -f ~/${PathConf.EXTEND_ZSH_CONF} ]] && . ~/${PathConf.EXTEND_ZSH_CONF}'
+  - name: Insert/update system path configuration block in ${PathConf.EXTEND_ZSH_CONF}
     blockinfile:
-      path: ~/.extend.zshrc
+      path: ~/${PathConf.EXTEND_ZSH_CONF}
       block: |
         PATH="\$PATH:\\
-${systemPath.toString()}"
-      marker: "# {mark} YDSU ANSIBLE MANAGED BLOCK FOR SYSTEM PATH"
+${systemPath}"
+      marker: "${PathConf.SYSTEM_PATH_CONF_MARKER}"
       create: yes      
 """
-    File cacheDir = new File(YDSU_CACHE, 'ydsu-system-path')
-    cacheDir.mkdirs()
-    File playbook = new File(cacheDir, 'playbook.yml')
-    playbook.write(playbookYaml)
-    runPlaybook(playbook)
+    PathConf.SYSTEM_PATH_WRITE_PLAYBOOK.write(playbookYaml)
+    runPlaybook()
 }
 
-void runPlaybook(File playbook) {
-    info Exec.command("ansible-playbook $playbook")
+void runPlaybook() {
+    longCommand("ansible-playbook ${PathConf.SYSTEM_PATH_WRITE_PLAYBOOK}")
 }
 
-void generateClassPathListString(List<Module> modules) {
+void generateClassPathListString(List<LocalModuleConf> moduleConfs) {
     StringBuilder sb = new StringBuilder()
-    sb.append('List<String> parentsOfRootPackage = [')
-    TreeSet<String> allClassPaths = modules.collect { it.classPath }.flatten()
-    allClassPaths << YDSU_PARENT_OF_ROOT_PACKAGE.toString()
-    if (!allClassPaths.isEmpty()) {
-        allClassPaths.each {
-            sb.append('"').append(it.replaceAll(USER_HOME.toString(), '\\\${System.getProperty(\'user.home\')}')).append('",\n')
+    sb.append('List<String> classPathList = [')
+    TreeSet<String> classPathList = moduleConfs.collect { it.classPath }.flatten()
+    classPathList << PathConf.CLASS_PATH_ROOT
+    new File(PathConf.CLASS_PATH_ROOT).eachDirRecurse {
+        classPathList << it.toString()
+    }
+    if (!classPathList.isEmpty()) {
+        classPathList.each {
+            sb.append('"').append(it.replaceAll(AppDataDirConf.USER_HOME, '\\\${System.getProperty(\'user.home\')}')).append('",\n')
         }
     }
-    sb.delete(sb.length() - 2, sb.length()).append(']')
-    generateClassPathConfiguration(sb.toString())
+    sb.delete(sb.length() - 2, sb.length()).append('].collect { it.toString() }')
+    generateGroovyConfigScriptWithClassPath(sb.toString())
 }
 
-void generateClassPathConfiguration(String classPathListString) {
-    def confGroovy = """
+void generateGroovyConfigScriptWithClassPath(String classPathListString) {
+    String groovyCompilerConf = """
 package ydsu.module.util.conf
 /**
  * For documentation refer to
@@ -158,31 +174,53 @@ package ydsu.module.util.conf
  * Starting from the src/main/groovy directory, add all the subdirectories recursively to the classpath
  * (src/main/groovy/ydsu/module/util/../../../).
  */
-List<String> dirs = []
-
-${classPathListString.toString()}
-
-parentsOfRootPackage.collect { new File(it) } .each {
-    dirs << it.toString()
-    it.eachDirRecurse {
-        dirs << it.toString()
-    }
-}
+${classPathListString}
 
 String ydsuClasspath = System.getenv("YDSU_CLASSPATH")
 if (ydsuClasspath) {
-    dirs.addAll(ydsuClasspath.tokenize(':'))
+    classPathList.addAll(ydsuClasspath.tokenize(':'))
 }
 
-configuration.setClasspathList(dirs)
-// configuration.setScriptBaseClass('common.basic.lib.LoggingBaseScript')
+configuration.setClasspathList(classPathList)
+// configuration.setScriptBaseClass('ysdu.util.source.LoggingBaseScript')
 """
-    writeClassPathConfiguration(confGroovy)
+    saveGroovyConfigScript(groovyCompilerConf)
 }
 
-void writeClassPathConfiguration(String confGroovy) {
-    File conf = new File(YDSU_MODULE, 'util/conf/groovyCompilerConfiguration.groovy')
-    conf.write(confGroovy)
+void saveGroovyConfigScript(String groovyCompilerConf) {
+    PathConf.GROOVY_COMPILER_WRITE_CONF.write(groovyCompilerConf)
+}
+
+void cleanCache(List<LocalModuleConf> moduleConfs) {
+    Set<String> owners = moduleConfs.collect { it.owner }
+    Set<String> repositories = moduleConfs.collect { "${it.owner}/${it.repository}".toString() }
+    File moduleSource = new File(PathConf.PUBLIC_MODULES_SOURCE_DIR)
+    if (moduleSource.exists()) {
+        moduleSource.eachDir {
+            if (owners.contains(it.name)) {
+                it.eachDir {
+                    String repo = "${it.parentFile.name}/${it.name}"
+                    if (!repositories.contains(repo)) {
+                        if (it.deleteDir()) {
+                            info "Repository '${repo}' is no longer in use inside ${PathConf.MODULE_READ_CONF}: " +
+                                    "directory deleted: ${it.toString()}"
+                        } else {
+                            error "Repository '${repo}' is no longer in use inside ${PathConf.MODULE_READ_CONF}: " +
+                                    "however directory could not be deleted: ${it.toString()}"
+                        }
+                    }
+                }
+            } else {
+                if (it.deleteDir()) {
+                    info "Repository owner '${it.name}' is no longer in use inside ${PathConf.MODULE_READ_CONF}: " +
+                            "directory deleted: ${it.toString()}"
+                } else {
+                    error "Repository owner '${it.name}' is no longer in use inside ${PathConf.MODULE_READ_CONF}: " +
+                            "however directory could not be deleted: ${it.toString()}"
+                }
+            }
+        }
+    }
 }
 
 parseModulesConfiguration()
