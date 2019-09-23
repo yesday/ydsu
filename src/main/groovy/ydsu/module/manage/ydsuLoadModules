@@ -68,6 +68,10 @@ void cloneModules(List<LocalModuleConf> moduleConfs) {
                 PublicModuleConf pmc = it
                 pmc.gitClone()
             }
+        } else {
+            if (!it.moduleMetadata) {
+                warn "Local module not found: ${it.confLine}"
+            }
         }
     }
 }
