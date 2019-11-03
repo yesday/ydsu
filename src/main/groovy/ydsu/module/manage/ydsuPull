@@ -42,24 +42,27 @@ info ''
 info begin("Pull modules under ${AppDataDirConf.PUBLIC_MODULES_SOURCE}", 2)
 int count = 0
 List<String> failedToPull = new ArrayList<>()
-new File(AppDataDirConf.PUBLIC_MODULES_SOURCE).eachDir {
-    it.eachDir {
-        count++
-        info ''
-        String repository = "${it.parentFile.name}/${it.name}"
-        info begin("Pull ${repository}", 2, count)
-        try {
-            if (isGitRepository(it)) {
-                longCommand 'git pull', it
-                info "Pulled ${repository}"
-            } else {
+File publicModulesSourceDir = new File(AppDataDirConf.PUBLIC_MODULES_SOURCE)
+if (publicModulesSourceDir.exists()) {
+    publicModulesSourceDir.eachDir {
+        it.eachDir {
+            count++
+            info ''
+            String repository = "${it.parentFile.name}/${it.name}"
+            info begin("Pull ${repository}", 2, count)
+            try {
+                if (isGitRepository(it)) {
+                    longCommand 'git pull', it
+                    info "Pulled ${repository}"
+                } else {
+                    failedToPull << repository
+                }
+            } catch (Exception e) {
+                error "Failed to pull ${repository}: $e.message"
                 failedToPull << repository
             }
-        } catch (Exception e) {
-            error "Failed to pull ${repository}: $e.message"
-            failedToPull << repository
+            info end(2, count)
         }
-        info end(2, count)
     }
 }
 
