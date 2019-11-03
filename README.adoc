@@ -57,7 +57,7 @@ A module is a number of shell scripts of relevant functionality that are grouped
 .module.yml
 [source, yaml]
 ----
-modules:
+module:
   - https://github.com/yesday/ydsu-module/master/src/main/groovy/ydsu/module/skeleton // <1>
   - ~/my-ydsu-module/src/main/groovy/ydsu/module // <2>
   - ~/mycompany-ydsu-module/src/main/groovy/ydsu/module/mycompany // <3>
