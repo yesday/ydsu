@@ -22,6 +22,7 @@ Advantages
 == Install
 
 Paste and run the following in a terminal:
+
 `$ curl -s "https://raw.githubusercontent.com/yesday/ydsu/master/src/main/bash/install/ydsu-install.sh" | bash`
 
 == Usage
