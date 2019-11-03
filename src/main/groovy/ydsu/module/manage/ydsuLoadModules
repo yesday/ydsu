@@ -1,93 +1,55 @@
-#!/usr/bin/env groovy-shebang
+#!/usr/bin/env ydsu-groovy-shebang
 package ydsu.module.manage
 
 import groovy.transform.BaseScript
-import org.yaml.snakeyaml.Yaml
 import ydsu.module.manage.conf.PathConf
+import ydsu.module.manage.source.ContainsRegularNonDocumentFile
 import ydsu.module.util.conf.AppDataDirConf
-import ydsu.module.util.source.LocalModuleConf
-import ydsu.module.util.source.LoggingBaseScript
-import ydsu.module.util.source.ModuleConfFactory
-import ydsu.module.util.source.PublicModuleConf
+import ydsu.module.util.source.*
 
 import static ydsu.module.util.source.Exec.longCommand
 
 @BaseScript LoggingBaseScript baseScript
 
 /**
- * Loads the changes from the `module.yml` file. Git clones modules into `~/appdata/ydsu/cache` and/or removes
+ * Loads the changes from the `module.yml` file. Git clones modules into `~/appdata/ydsu/cache/` and/or removes
  * the ones that are no longer present inside the `module.yml` file. Updates the ansible-managed block for ydsu's
  * system path inside `.bashrc`. Note that this command will not update existing modules, which can be done by the
  * `ydsuPull` command.
  */
-@Grab(group = 'org.yaml', module = 'snakeyaml', version = '1.25', transitive = false)
 
-void parseModulesConfiguration() {
-    if (PathConf.MODULE_READ_CONF.exists()) {
-        Yaml yaml = new Yaml()
-        LinkedHashMap conf = yaml.load(PathConf.MODULE_READ_CONF.text)
-        List<String> confLines = conf.module
-        if (confLines) {
-            info "Using module.yml: ${PathConf.MODULE_READ_CONF}"
-            if (PathConf.MODULE_READ_CONF != PathConf.MODULE_WRITE_CONF) {
-                info "To update the configuration create a copy of the above module.yml in ${PathConf.MODULE_WRITE_CONF}"
-            }
-            createModuleConfigurations(confLines)
-        } else {
-            warn "Modules list is empty, no modules are loaded: ${PathConf.MODULE_READ_CONF}"
-        }
+void loadModules() {
+    ModuleLoader moduleLoader = new ModuleLoader(ContainsRegularNonDocumentFile.instance,
+            CurrentModule.instance.id,
+            CurrentModule.instance.systemPath,
+            'module')
+    List<LocalModuleGroup> moduleGroups = moduleLoader.loadModuleGroups()
+    generateSystemPathListString(moduleGroups)
+    generateClasspathListString(moduleGroups)
+    info '\n\n\n'
+    if (moduleGroups) {
+        info 'All done!'
     } else {
-        warn "File does not exist, no modules are loaded: ${PathConf.MODULE_READ_CONF}"
+        warn 'System path and classpath configuration was cleared due to empty module list'
     }
+    info '\n\n'
+    info 'Please open a new terminal, or run the following in the existing one:'
+    info ''
+    info '    source ~/.bashrc'
+    info ''
 }
 
-void createModuleConfigurations(List<String> confLines) {
-    ModuleConfFactory moduleConfFactory = new ModuleConfFactory()
-    List<LocalModuleConf> moduleConfs
-    try {
-        moduleConfs = confLines.collect { moduleConfFactory.newModuleConf(it) }
-    } catch (IllegalArgumentException e) {
-        String msg = "Could not parse ${PathConf.MODULE_READ_CONF}: "
-        if (PathConf.MODULE_READ_CONF == PathConf.MODULE_WRITE_CONF) {
-            msg += "fix the errors and try again"
-        } else {
-            msg += "create a copy in ${PathConf.MODULE_WRITE_CONF}, fix the errors, and try again"
-        }
-        throw new RuntimeException(msg, e)
-    }
-    cloneModules(moduleConfs)
-    generateSystemPathListString(moduleConfs)
-    generateClassPathListString(moduleConfs)
-    cleanCache(moduleConfs)
-}
-
-void cloneModules(List<LocalModuleConf> moduleConfs) {
-    moduleConfs.each {
-        if (it instanceof PublicModuleConf) {
-            if (!it.moduleMetadata) {
-                PublicModuleConf pmc = it
-                pmc.gitClone()
-            }
-        } else {
-            if (!it.moduleMetadata) {
-                warn "Local module not found: ${it.confLine}"
-            }
-        }
-    }
-}
-
-void generateSystemPathListString(List<LocalModuleConf> moduleConfs) {
+void generateSystemPathListString(List<LocalModuleGroup> moduleGroups) {
     StringBuilder sb = new StringBuilder()
-    String internalModulesParentDir = PathConf.MODULES_PARENT_DIR.replaceAll(AppDataDirConf.USER_HOME, '\\\$HOME')
-    sb.append('        ').append(internalModulesParentDir).append('manage').append(':\\\n')
-    sb.append('        ').append(internalModulesParentDir).append('util').append(':\\\n')
-    TreeSet<String> allSystemPaths = moduleConfs.collect { it.systemPath }.flatten()
+    String internalModulesBaseDir = AppDataDirConf.INTERNAL_MODULES_BASE_DIR.replaceAll(AppDataDirConf.USER_HOME, '\\\$HOME')
+    sb.append('        ').append(internalModulesBaseDir).append('manage').append(':\\\n')
+    sb.append('        ').append(internalModulesBaseDir).append('util').append(':\\\n')
+    TreeSet<String> allSystemPaths = moduleGroups.collect { it.systemPath }.flatten()
     if (allSystemPaths.isEmpty()) {
         warn "couldn't load any module"
     } else {
         allSystemPaths.each {
             sb.append('        ').append(it.replaceAll(AppDataDirConf.USER_HOME, '\\\$HOME')).append(':\\\n')
-            // sb.append(it).append(':')
         }
     }
     sb.delete(sb.length() - 3, sb.length())
@@ -149,24 +111,25 @@ void runPlaybook() {
     longCommand("ansible-playbook ${PathConf.SYSTEM_PATH_WRITE_PLAYBOOK}")
 }
 
-void generateClassPathListString(List<LocalModuleConf> moduleConfs) {
+void generateClasspathListString(List<LocalModuleGroup> moduleGroups) {
     StringBuilder sb = new StringBuilder()
-    sb.append('List<String> classPathList = [')
-    TreeSet<String> classPathList = moduleConfs.collect { it.classPath }.flatten()
-    classPathList << PathConf.CLASS_PATH_ROOT
-    new File(PathConf.CLASS_PATH_ROOT).eachDirRecurse {
-        classPathList << it.toString()
+    sb.append('List<String> classpathList = [')
+    TreeSet<String> classpathList = moduleGroups.findAll { it.moduleGroupSystemPath }
+            .collect { Classpath.from(it.moduleGroupSystemPath.systemPathRoot) }.flatten()
+    classpathList << AppDataDirConf.INTERNAL_MODULES_CLASSPATH_ROOT
+    new File(AppDataDirConf.INTERNAL_MODULES_CLASSPATH_ROOT).eachDirRecurse {
+        classpathList << it.toString()
     }
-    if (!classPathList.isEmpty()) {
-        classPathList.each {
+    if (!classpathList.isEmpty()) {
+        classpathList.each {
             sb.append('"').append(it.replaceAll(AppDataDirConf.USER_HOME, '\\\${System.getProperty(\'user.home\')}')).append('",\n')
         }
     }
     sb.delete(sb.length() - 2, sb.length()).append('].collect { it.toString() }')
-    generateGroovyConfigScriptWithClassPath(sb.toString())
+    generateGroovyConfigScriptWithClasspath(sb.toString())
 }
 
-void generateGroovyConfigScriptWithClassPath(String classPathListString) {
+void generateGroovyConfigScriptWithClasspath(String classpathListString) {
     String groovyCompilerConf = """
 package ydsu.module.util.conf
 /**
@@ -178,14 +141,14 @@ package ydsu.module.util.conf
  * Starting from the src/main/groovy directory, add all the subdirectories recursively to the classpath
  * (src/main/groovy/ydsu/module/util/../../../).
  */
-${classPathListString}
+${classpathListString}
 
 String ydsuClasspath = System.getenv("YDSU_CLASSPATH")
 if (ydsuClasspath) {
-    classPathList.addAll(ydsuClasspath.tokenize(':'))
+    classpathList.addAll(ydsuClasspath.tokenize(':'))
 }
 
-configuration.setClasspathList(classPathList)
+configuration.setClasspathList(classpathList)
 // configuration.setScriptBaseClass('ysdu.util.source.LoggingBaseScript')
 """
     saveGroovyConfigScript(groovyCompilerConf)
@@ -195,36 +158,4 @@ void saveGroovyConfigScript(String groovyCompilerConf) {
     PathConf.GROOVY_COMPILER_WRITE_CONF.write(groovyCompilerConf)
 }
 
-void cleanCache(List<LocalModuleConf> moduleConfs) {
-    Set<String> owners = moduleConfs.collect { it.owner }
-    Set<String> repositories = moduleConfs.collect { "${it.owner}/${it.repository}".toString() }
-    File moduleSource = new File(PathConf.PUBLIC_MODULES_SOURCE_DIR)
-    if (moduleSource.exists()) {
-        moduleSource.eachDir {
-            if (owners.contains(it.name)) {
-                it.eachDir {
-                    String repo = "${it.parentFile.name}/${it.name}"
-                    if (!repositories.contains(repo)) {
-                        if (it.deleteDir()) {
-                            info "Repository '${repo}' is no longer in use inside ${PathConf.MODULE_READ_CONF}: " +
-                                    "directory deleted: ${it.toString()}"
-                        } else {
-                            error "Repository '${repo}' is no longer in use inside ${PathConf.MODULE_READ_CONF}: " +
-                                    "however directory could not be deleted: ${it.toString()}"
-                        }
-                    }
-                }
-            } else {
-                if (it.deleteDir()) {
-                    info "Repository owner '${it.name}' is no longer in use inside ${PathConf.MODULE_READ_CONF}: " +
-                            "directory deleted: ${it.toString()}"
-                } else {
-                    error "Repository owner '${it.name}' is no longer in use inside ${PathConf.MODULE_READ_CONF}: " +
-                            "however directory could not be deleted: ${it.toString()}"
-                }
-            }
-        }
-    }
-}
-
-parseModulesConfiguration()
+loadModules()

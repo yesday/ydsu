@@ -4,12 +4,13 @@ import com.google.common.base.Preconditions
 import com.google.common.base.Strings
 import groovy.transform.PackageScope
 import groovy.util.logging.Slf4j
-import groovyjarjarantlr4.v4.runtime.misc.NotNull
 
 import javax.validation.Valid
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.NotEmpty
+import javax.validation.constraints.NotNull
 
+import static ydsu.module.util.source.Args.notBlank
 import static ydsu.module.util.source.Exec.command
 import static ydsu.module.util.source.Exec.longCommand
 
@@ -19,6 +20,7 @@ import static ydsu.module.util.source.Exec.longCommand
  * Not thread-safe. Instances of this class are mutable. To use them concurrently, clients must surround each method
  * invocation (or invocation sequence) with external synchronization of the clients' choosing.
  */
+@Grab(group = 'javax.validation', module = 'validation-api', version = '2.0.1.Final', transitive = false)
 @Slf4j
 class DockerClient {
     //region Data members
@@ -38,13 +40,13 @@ class DockerClient {
 
     //region Constructors
     DockerClient(@NotBlank String imageName) {
-        Args.notBlank('imageName', imageName)
+        notBlank 'imageName', imageName
         this.imageName = imageName
     }
 
     DockerClient(@NotBlank String imageName, @NotBlank String imageDir) {
-        Args.notBlank('imageName', imageName)
-        Args.notBlank('imageDir', imageDir)
+        notBlank 'imageName', imageName
+        notBlank 'imageDir', imageDir
         this.imageName = imageName
         this.imageDir = imageDir
     }
@@ -54,8 +56,8 @@ class DockerClient {
     @NotNull
     @Valid
     DockerClient withBindMount(@NotBlank String hostPath, @NotBlank String containerPath, boolean readonly = true) {
-        Args.notBlank('hostPath', hostPath)
-        Args.notBlank('containerPath', containerPath)
+        notBlank 'hostPath', hostPath
+        notBlank 'containerPath', containerPath
         bindMounts.put(containerPath, new Tuple2<>(hostPath, readonly))
         this
     }
@@ -63,8 +65,8 @@ class DockerClient {
     @NotNull
     @Valid
     DockerClient withVolume(@NotBlank String hostPath, @NotBlank String containerPath) {
-        Args.notBlank('hostPath', hostPath)
-        Args.notBlank('containerPath', containerPath)
+        notBlank 'hostPath', hostPath
+        notBlank 'containerPath', containerPath
         volumes.put(containerPath, hostPath)
         this
     }
@@ -72,7 +74,7 @@ class DockerClient {
     @NotNull
     @Valid
     DockerClient withEnv(@NotBlank String key, String value) {
-        Args.notBlank('key', key)
+        notBlank 'key', key
         env.put(key, value)
         this
     }
@@ -82,7 +84,7 @@ class DockerClient {
     DockerClient withPublishedPorts(@NotEmpty Tuple2<String, String>... port) {
         Preconditions.checkArgument(port != null && port.size() > 0, "Argument 'port' must not be empty")
         for (int i = 0; i < port.length; i++) {
-            Args.notBlank("port$i", port[i].v1)
+            notBlank "port$i", port[i].v1
         }
         publishedPorts.addAll(port)
         this
@@ -109,7 +111,7 @@ class DockerClient {
 
     @NotNull
     String execInContainer(@NotBlank String cmd) {
-        Args.notBlank('cmd', cmd)
+        notBlank 'cmd', cmd
         if (isRunning()) {
             // Example: docker exec -t b53d2d7d647b date
             return command("docker exec -t $containerId $cmd")
@@ -120,7 +122,7 @@ class DockerClient {
 
     @NotNull
     String execScriptInContainer(@NotBlank String multilineScript) {
-        Args.notBlank('multilineScript', multilineScript)
+        notBlank 'multilineScript', multilineScript
         if (isRunning()) {
             // Example: String command = "docker exec -t b53d2d7d647b bash -c 'mkdir -p \$HOME/dir; pwd'"
             String cmd = multilineScript.lines().filter { !it.isBlank() }

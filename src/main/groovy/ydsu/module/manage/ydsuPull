@@ -1,8 +1,8 @@
-#!/usr/bin/env groovy-shebang
+#!/usr/bin/env ydsu-groovy-shebang
 package ydsu.module.manage
 
 import groovy.transform.BaseScript
-import ydsu.module.manage.conf.PathConf
+import ydsu.module.util.conf.AppDataDirConf
 import ydsu.module.util.source.LoggingBaseScript
 
 import static ydsu.module.util.source.Exec.longCommand
@@ -26,9 +26,9 @@ private boolean isGitRepository(File repositoryDir) {
 }
 
 info ''
-info begin("Pull ydsu source under ${PathConf.YDSU_SOURCE}", 1)
+info begin("Pull ydsu source under ${AppDataDirConf.INTERNAL_MODULES_REPOSITORY}", 1)
 try {
-    File ydsuSource = new File(PathConf.YDSU_SOURCE)
+    File ydsuSource = new File(AppDataDirConf.INTERNAL_MODULES_REPOSITORY)
     if (isGitRepository(ydsuSource)) {
         longCommand 'git pull', ydsuSource
         info 'Pulled ydsu source'
@@ -39,10 +39,10 @@ try {
 info end(1)
 
 info ''
-info begin("Pull modules under ${PathConf.PUBLIC_MODULES_SOURCE_DIR}", 2)
+info begin("Pull modules under ${AppDataDirConf.PUBLIC_MODULES_SOURCE}", 2)
 int count = 0
 List<String> failedToPull = new ArrayList<>()
-new File(PathConf.PUBLIC_MODULES_SOURCE_DIR).eachDir {
+new File(AppDataDirConf.PUBLIC_MODULES_SOURCE).eachDir {
     it.eachDir {
         count++
         info ''

@@ -1,8 +1,10 @@
 package ydsu.module.util.conf
 
 interface AppDataDirConf {
+    //region Upper-level directories
     String USER_HOME = System.getProperty('user.home')
     String APP_HOME = "${USER_HOME}/appdata/ydsu/"
+    //endregion
 
     //region Types of Application Data
     /**
@@ -63,4 +65,11 @@ interface AppDataDirConf {
      */
     String REPORT = "${APP_HOME}report/"
     //endregion
+
+    //region Module-specific directories used by the internal 'util' module
+    String PUBLIC_MODULES_SOURCE = "${CACHE}yesday-ydsu-manage/source/"
+    String INTERNAL_MODULES_REPOSITORY = "${SOURCE}yesday/ydsu/"
+    String INTERNAL_MODULES_CLASSPATH_ROOT = "${INTERNAL_MODULES_REPOSITORY}src/main/groovy/"
+    String INTERNAL_MODULES_BASE_DIR = "${INTERNAL_MODULES_CLASSPATH_ROOT}ydsu/module/"
+    //region
 }

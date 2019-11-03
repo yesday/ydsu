@@ -1,14 +1,14 @@
 buildscript {
     ext {
-        junitJupiterVersion = '5.5.2'
-        junitPlatformVersion = '1.5.2'
+        junitJupiterVersion = '5.6.0-M1'
+        junitPlatformVersion = '1.6.0-M1'
     }
 }
 
 plugins {
     id 'groovy'
     id 'maven-publish'
-    id 'com.github.ben-manes.versions' version '0.25.0'
+    id 'com.github.ben-manes.versions' version '0.27.0'
 }
 
 group = 'io.github.yesday'
@@ -39,8 +39,8 @@ repositories {
 
 dependencies {
     //region Groovy
-    implementation group: 'org.codehaus.groovy', name: 'groovy', version: '3.0.0-beta-3'
-    implementation group: 'org.codehaus.groovy', name: 'groovy-templates', version: '3.0.0-beta-3'
+    implementation group: 'org.codehaus.groovy', name: 'groovy', version: '3.0.0-rc-1'
+    implementation group: 'org.codehaus.groovy', name: 'groovy-templates', version: '3.0.0-rc-1'
     //endregion
 
     /**
@@ -53,7 +53,7 @@ dependencies {
      */
 
     //region Dev troubleshooting
-    implementation group: 'org.apache.ivy', name: 'ivy', version: '2.5.0-rc1'
+    implementation group: 'org.apache.ivy', name: 'ivy', version: '2.5.0'
     //endregion
 
     //region Testing
@@ -63,8 +63,8 @@ dependencies {
     testImplementation group: 'org.junit.platform', name: 'junit-platform-commons', version: junitPlatformVersion
     testImplementation group: 'org.junit.platform', name: 'junit-platform-engine', version: junitPlatformVersion
     testImplementation group: 'org.opentest4j', name: 'opentest4j', version: '1.2.0'
-    testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '3.0.0'
-    testImplementation group: 'org.assertj', name: 'assertj-core', version: '3.13.2'
+    testImplementation group: 'org.mockito', name: 'mockito-junit-jupiter', version: '3.1.0'
+    testImplementation group: 'org.assertj', name: 'assertj-core', version: '3.14.0'
     //endregion
 
     //region Util

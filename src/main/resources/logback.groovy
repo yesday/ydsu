@@ -40,9 +40,9 @@ appender("STDOUT", ConsoleAppender) {
     }
 }
 /**
- * In accordance with the https://12factor.net/logs[Logs] best practice from the
- * https://12factor.net[Twelve-Factor App Practices], logs are written as an ordered event stream to stdout so that the
- * logfiles will be managed by the execution environment.
+ * In accordance with the Logs (https://12factor.net/logs) best practice from the Twelve-Factor App Practices
+ * (https://12factor.net), logs are written as an ordered event stream to stdout so that the logfiles will be managed by
+ * the execution environment.
  */
 root(ALL, ["STDOUT"])
 logger("org.springframework", WARN)

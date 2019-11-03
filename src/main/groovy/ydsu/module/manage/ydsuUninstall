@@ -1,4 +1,4 @@
-#!/usr/bin/env groovy-shebang
+#!/usr/bin/env ydsu-groovy-shebang
 package ydsu.module.manage
 
 import groovy.transform.BaseScript
@@ -44,16 +44,16 @@ info ''
 info "Remove ${PathConf.SYSTEM_PATH_CONF_TITLE} from ${PathConf.EXTEND_BASH_CONF} and ${PathConf.EXTEND_ZSH_CONF}."
 generateSystemPathPlaybook()
 
-info "Clear ${PathConf.PUBLIC_MODULES_SOURCE_DIR}"
-longCommand "rm -rf ${PathConf.PUBLIC_MODULES_SOURCE_DIR}"
+info "Clear ${AppDataDirConf.PUBLIC_MODULES_SOURCE}"
+longCommand "rm -rf ${AppDataDirConf.PUBLIC_MODULES_SOURCE}"
 
 info ''
 info "Clear ${AppDataDirConf.CACHE}"
 longCommand "rm -rf ${AppDataDirConf.CACHE}"
 
 info ''
-info "Clear ${PathConf.YDSU_SOURCE}"
-longCommand "rm -rf ${PathConf.YDSU_SOURCE}"
+info "Clear ${AppDataDirConf.INTERNAL_MODULES_REPOSITORY}"
+longCommand "rm -rf ${AppDataDirConf.INTERNAL_MODULES_REPOSITORY}"
 
 info ''
 info 'Successfully uninstalled ydsu'

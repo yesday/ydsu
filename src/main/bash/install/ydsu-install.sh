@@ -18,8 +18,8 @@
 if [ -z "$YDSU_HOME" ]; then
   YDSU_HOME="$HOME/appdata/ydsu"
 fi
-YDSU_SOURCE="${YDSU_HOME}/source/yesday/ydsu"
-YDSU_MODULE="${YDSU_SOURCE}/src/main/groovy/ydsu/module"
+INTERNAL_MODULES_REPOSITORY="${YDSU_HOME}/source/yesday/ydsu"
+INTERNAL_MODULES_BASE_DIR="${INTERNAL_MODULES_REPOSITORY}/src/main/groovy/ydsu/module"
 if [ -z "$YDSU_REPO" ]; then
   YDSU_REPO=https://github.com/yesday/ydsu.git
 fi
@@ -40,14 +40,14 @@ echo ''
 echo ''
 
 echo "Looking for a previous installation of ydsu..."
-if [ -d "$YDSU_SOURCE" ]; then
+if [ -d "$INTERNAL_MODULES_REPOSITORY" ]; then
   echo "ydsu found."
   echo ""
   echo "======================================================================================================"
   echo " You already have ydsu installed."
   echo " ydsu was found at:"
   echo ""
-  echo "    ${YDSU_SOURCE}"
+  echo "    ${INTERNAL_MODULES_REPOSITORY}"
   echo ""
   echo " Please consider running the following if you need to upgrade."
   echo ""
@@ -111,20 +111,13 @@ cd -
 mkdir -p "${YDSU_HOME}/source/yesday/"
 if [[ $YDSU_REPO == /* ]]; then
   # if it's a local directory then just copy it's contents
-  cp -R ${YDSU_REPO} "${YDSU_SOURCE}"
+  cp -R ${YDSU_REPO} "${INTERNAL_MODULES_REPOSITORY}"
 else
-  git clone ${YDSU_REPO} "${YDSU_SOURCE}"
+  git clone ${YDSU_REPO} "${INTERNAL_MODULES_REPOSITORY}"
 fi
 
 PATH="$PATH:\
-${YDSU_MODULE}/manage:\
-${YDSU_MODULE}/util"
+${INTERNAL_MODULES_BASE_DIR}/manage:\
+${INTERNAL_MODULES_BASE_DIR}/util"
 
-"${YDSU_MODULE}/manage/ydsuLoadModules"
-
-echo -e "\n\n\nAll done!\n\n"
-
-echo "Please open a new terminal, or run the following in the existing one:"
-echo ""
-echo "    source ~/.bashrc"
-echo ""
+"${INTERNAL_MODULES_BASE_DIR}/manage/ydsuLoadModules"

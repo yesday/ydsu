@@ -6,11 +6,16 @@ import ydsu.module.util.conf.AppDataDirConf
 import javax.validation.constraints.NotBlank
 import java.nio.file.Paths
 
+import static ydsu.module.util.source.Args.notBlank
+
 /**
  * Application data class used for writing purposes.
  *
  * The class {@link WriteAppData} is in fact a facade representing the Overridden location for the application data.
  * Refer to the documentation of {@link ReadAppData} for an explanation of what the Overridden location is.
+ *
+ * @see ReadAppData
+ * @see AppDataFactory
  */
 @Grab(group = 'javax.validation', module = 'validation-api', version = '2.0.1.Final')
 @EqualsAndHashCode
@@ -18,10 +23,10 @@ class WriteAppData {
     private String moduleId
 
     /**
-     * Create a new instance for the given {@code moduleId}. The module id will separate the data from one module to
-     * another. If module id is {@code null} then the instance will represent global cross-module shared resources. The
-     * latter means that a call for a particular resource will resolve to the same file, regardless of the module that
-     * is going to use it.
+     * Create a new instance for the given {@code moduleId}. The module id is used to fetch the overridden data and will
+     * separate the data from one module to another. If module id is {@code null} then the instance will represent
+     * global cross-module shared resources. The latter means that a call for a particular resource will resolve to the
+     * same file, regardless of the module that is going to use it.
      *
      * @param moduleId the module id or {@code null} for a global cross-module shared instance
      */
@@ -73,7 +78,7 @@ class WriteAppData {
      * @return the overridden file
      */
     private File getOverriddenResource(String appDataDirConf, String path) {
-        Args.notBlank('path', path)
+        notBlank 'path', path
         File overridden = moduleId ? Paths.get(appDataDirConf, moduleId, path).toFile() : Paths.get(appDataDirConf, path).toFile()
         if (!overridden.parentFile.exists()) {
             overridden.parentFile.mkdirs()

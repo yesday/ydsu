@@ -14,7 +14,7 @@ dirs << groovyDir.toString()
 groovyDir.eachDirRecurse {
     dirs << it.toString()
 }
-String ydsuClasspath = System.getenv("YDSU_CLASSPATH")
+String ydsuClasspath = System.getenv('YDSU_CLASSPATH')
 if (ydsuClasspath) {
     dirs.addAll(ydsuClasspath.tokenize(':'))
 }
