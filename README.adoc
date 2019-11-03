@@ -7,17 +7,17 @@ toc::[]
 
 == About
 
-YesDay System Utilities (ydsu), pronounced `i'dsʊ`, is a package manager for your shell scripts. Primarily targeted for use by Developers, SysAdmins, Power Users, DevOps and Operations Engineers, ydsu is designed to encourage modification of the shell scripts in an IDE-friendly way. Shell scripts of relevant functionality are grouped together into modules and are managed by the management scripts provided by ydsu. Modules can be either external, developed by a third party, or your own. You specify the list of modules you want to use inside the `module.yml` file. Your local configuration of modules inside the `module.yml` is called a distribution.
+YesDay System Utilities (ydsu), pronounced `i'dsʊ`, is a package manager for your shell scripts. Primarily targeted for use by Developers, SysAdmins, Power Users, DevOps and Operations Engineers, ydsu is designed to encourage modification of the shell scripts in an IDE-friendly way. Shell scripts of relevant functionality are grouped into modules and are managed by the management scripts provided by ydsu. Modules can be either external, developed by a third party, or your own. You specify the list of modules you want to use inside the `module.yml` file. Your local configuration of modules inside the `module.yml` is called a distribution.
 
 Advantages
 
 * *Lightweight* - Total codebase of *~2k* lines of code. Only requires git, ansible and groovy to be present on your system. Even works with ZSH too.
-* *Multi-platform* - Runs on any UNIX based platforms: Mac OSX, Linux, Cygwin, Solaris and FreeBSD.
-* *Modular and easy to extend* - You can create modules for your own individual needs and/or make them available to the public. Even ydsu itself is implemented as a set of two (internal) modules: `manage` and `util`. More so, if you write your modules in a JVM language, you can take advantage of the internal module `util`.
+* *Multi-platform* - Runs on any UNIX based platforms: Mac OSX, Linux, Cygwin, Solaris, and FreeBSD.
+* *Modular and easy to extend* - You can create modules for your individual needs and/or make them available to the public. Even ydsu itself is implemented as a set of two (internal) modules: `manage` and `util`. More so, if you write your modules in a JVM language, you can take advantage of the internal module `util`.
 * *Polyglot* - Write your modules in any programming language: Groovy, Bash, Kotlin, Java, Python, Go, Ruby, Node.js, Rust, Dlang, you name it. Ydsu will manage them in the same way.
 * *Distributed - no lock-in* - Store your modules in any private or public git repository. Ydsu will take care of the rest. Even ydsu itself can be hosted on and installed from your own private repository. It is designed from the ground up NOT to lock you into any specific repository.
-* *Can operate in any network or even air-gaped environment* - Ydsu can be used in internet/intranet/LAN or even air-gaped environments. No matter what environment you are in, you can take full advantage of the features.
-* *Lines of Code (LOC) and Code Quality* - Well written, clean and high quality codebase: 1952 lines of groovy code, 139 lines of bash code, 26% comments, 27 groovy files, 2 bash files, 72 lines per file on average.
+* *Can operate in any network or even air-gapped environment* - Ydsu can be used on internet/intranet/LAN or even air-gapped environments. No matter what environment you are in, you can take full advantage of the features.
+* *Lines of Code (LOC) and Code Quality* - Well written, clean and high-quality codebase: 1952 lines of groovy code, 139 lines of bash code, 26% comments, 27 groovy files, 2 bash files, 72 lines per file on average.
 
 == Install
 
@@ -44,7 +44,7 @@ Extend
 
 * Create a new module and push it to a local or remote git repository. A module can contain anything that would work by adding it to your system path, such as a bash or groovy shell script. Use the `skeleton` module as a blueprint for your own modules.
 * ~/appdata/ydsu/conf/yesday-ydsu-manage/*module.yml*: Create or edit the `module.yml` file to add the new module into your distribution.
-* *ydsuLoadModules*: Always remember to run `ydsuLoadModules` after modifying `module.yml` in order for the changes to take effect.
+* *ydsuLoadModules*: Always remember to run `ydsuLoadModules` after modifying `module.yml` for the changes to take effect.
 
 Maintain
 
@@ -52,7 +52,7 @@ Maintain
 
 == Configuration guide for module.yml
 
-A module is a number of shell scripts of relevant functionality that are grouped together into a directory. The module directory is usually versioned and is part of a project structure, such as the gradle's directory layout for a groovy application (e.g. `gradle init --type groovy-application`). The latter is to encourage modification of the shell scripts in an IDE-friendly way. Modules can be either external, developed by a third party, or your own. A module is configured by specifying a local or remote path. The path can refer to either a single module or a collection of modules. Following is an example of a `module.yml` that demonstrates the configuration of a public module, a local collection of modules, and a single local module.
+A module consists of shell scripts of relevant functionality that are grouped into a directory. The module directory is usually versioned and is part of a project structure, such as the gradle's directory layout for a groovy application (e.g. `gradle init --type groovy-application`). The latter is to encourage modification of the shell scripts in an IDE-friendly way. Modules can be either external, developed by a third party, or your own. A module is configured by specifying a local or remote path. The path can refer to either a single module or a collection of modules. Following is an example of a `module.yml` that demonstrates the configuration of a public module, a local collection of modules, and a single local module.
 
 .module.yml
 [source, yaml]
