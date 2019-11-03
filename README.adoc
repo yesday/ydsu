@@ -11,7 +11,7 @@ YesDay System Utilities (ydsu), pronounced `i'dsʊ`, is a package manager for yo
 
 Advantages
 
-* *Lightweight* - Only requires git, ansible and groovy to be present on your system. Even works with ZSH too. *~2k* lines of code.
+* *Lightweight* - Total codebase of *~2k* lines of code. Only requires git, ansible and groovy to be present on your system. Even works with ZSH too.
 * *Multi-platform* - Runs on any UNIX based platforms: Mac OSX, Linux, Cygwin, Solaris and FreeBSD.
 * *Modular and easy to extend* - You can create modules for your own individual needs and/or make them available to the public. Even ydsu itself is implemented as a set of two (internal) modules: `manage` and `util`. More so, if you write your modules in a JVM language, you can take advantage of the internal module `util`.
 * *Polyglot* - Write your modules in any programming language: Groovy, Bash, Kotlin, Java, Python, Go, Ruby, Node.js, Rust, Dlang, you name it. Ydsu will manage them in the same way.
